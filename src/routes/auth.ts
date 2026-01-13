@@ -6,16 +6,20 @@ import {
   register,
 } from "../controllers/auth-controller.ts";
 import {
-  UserLoginSchema,
-  UserRefreshTokenSchema,
-  UserRegisterSchema,
+  LoginRequestSchema,
+  RefreshTokenRequestSchema,
+  RegisterRequestSchema,
 } from "../schemas/user-schema.ts";
 import { validate } from "../util/validation.ts";
 
 const router = express.Router();
 
-router.post("/login", validate(UserLoginSchema, "body"), login);
-router.post("/register", validate(UserRegisterSchema, "body"), register);
-router.post("/refresh", validate(UserRefreshTokenSchema, "body"), refreshToken);
+router.post("/login", validate(LoginRequestSchema, "body"), login);
+router.post("/register", validate(RegisterRequestSchema, "body"), register);
+router.post(
+  "/refresh",
+  validate(RefreshTokenRequestSchema, "body"),
+  refreshToken,
+);
 
 export default router;

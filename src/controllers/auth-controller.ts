@@ -1,21 +1,24 @@
 import { NextFunction, Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
-import jsonwebtoken from "jsonwebtoken";
 import { z } from "zod";
 
-import { JWT_SECRET } from "../database/config/config.ts";
 import User from "../database/models/user.ts";
 import {
-  UserLoginSchema,
-  UserRefreshTokenSchema,
-  UserRegisterSchema,
+  LoginRequestSchema,
+  RefreshTokenRequestSchema,
+  RegisterRequestSchema,
 } from "../schemas/user-schema.ts";
-import { generateAuthToken, generateRefreshToken } from "../util/jwt.ts";
+import { ApiError } from "../util/errors.ts";
+import {
+  generateAuthToken,
+  generateRefreshToken,
+  verifyAuthToken,
+} from "../util/jwt.ts";
 import { comparePassword, hashPassword } from "../util/password.ts";
 
-type LoginPayload = z.infer<typeof UserLoginSchema>;
-type RefreshTokenPayload = z.infer<typeof UserRefreshTokenSchema>;
-type RegisterPayload = z.infer<typeof UserRegisterSchema>;
+type LoginPayload = z.infer<typeof LoginRequestSchema>;
+type RefreshTokenPayload = z.infer<typeof RefreshTokenRequestSchema>;
+type RegisterPayload = z.infer<typeof RegisterRequestSchema>;
 
 export const login = async (
   req: Request<unknown, unknown, LoginPayload>,
@@ -28,20 +31,14 @@ export const login = async (
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      next({
-        message: "Invalid credentials",
-        status: StatusCodes.UNAUTHORIZED,
-      });
+      next(new ApiError("Invalid credentials", StatusCodes.UNAUTHORIZED));
       return;
     }
 
     const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
-      next({
-        message: "Invalid credentials",
-        status: StatusCodes.UNAUTHORIZED,
-      });
+      next(new ApiError("Invalid credentials", StatusCodes.UNAUTHORIZED));
       return;
     }
 
@@ -50,10 +47,12 @@ export const login = async (
     const refreshToken = generateRefreshToken(payload);
 
     if (!token || !refreshToken) {
-      next({
-        message: "Could not generate authentication token",
-        status: StatusCodes.INTERNAL_SERVER_ERROR,
-      });
+      next(
+        new ApiError(
+          "Could not generate authentication token",
+          StatusCodes.INTERNAL_SERVER_ERROR,
+        ),
+      );
       return;
     }
 
@@ -80,10 +79,7 @@ export const register = async (
     const userAlreadyExists = await User.findOne({ where: { email } });
 
     if (userAlreadyExists) {
-      next({
-        message: "Email already in use",
-        status: StatusCodes.BAD_REQUEST,
-      });
+      next(new ApiError("Email already in use", StatusCodes.BAD_REQUEST));
       return;
     }
 
@@ -116,26 +112,22 @@ export const register = async (
 export const refreshToken = async (
   req: Request<unknown, unknown, RefreshTokenPayload>,
   res: Response,
+  next: NextFunction,
 ) => {
-  const { refreshToken } = req.body;
-
-  if (!refreshToken) {
-    return res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: "Unauthorized: No token provided" });
-  }
-
   try {
-    const { userId } = jsonwebtoken.verify(refreshToken, JWT_SECRET) as {
-      userId: string;
-    };
+    const { refreshToken } = req.body;
+    const decoded = verifyAuthToken(refreshToken);
+    const { userId } = decoded;
 
     const user = await User.findByPk(userId);
-
     if (user?.refreshToken !== refreshToken) {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ message: "Unauthorized: User not found" });
+      next(
+        new ApiError(
+          "Unauthorized: Invalid refresh token",
+          StatusCodes.UNAUTHORIZED,
+        ),
+      );
+      return;
     }
 
     const newAuthToken = generateAuthToken({ userId });
@@ -148,8 +140,6 @@ export const refreshToken = async (
       refresh_token: newRefreshToken,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Unauthorized: Invalid token";
-    return res.status(StatusCodes.UNAUTHORIZED).json({ message });
+    next(err);
   }
 };
