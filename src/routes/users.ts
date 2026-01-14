@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { StatusCodes } from "http-status-codes";
 import jsonwebtoken from "jsonwebtoken";
 
@@ -30,6 +31,13 @@ const validateToken = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const router = express.Router();
+const authLimiter = rateLimit({
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again after 15 minutes",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+});
+
+router.use(authLimiter);
 
 router.get("/me", validateToken, getCurrentUser);
 
