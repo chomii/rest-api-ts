@@ -4,7 +4,7 @@ A simple, production-ready RESTful API built with Node.js, Express, and TypeScri
 
 ## Features
 
-- User authentication (login, register, refresh token)
+- User authentication
 - Secure password hashing with bcrypt
 - JWT-based authentication and authorization
 - Input validation with Zod
@@ -12,8 +12,7 @@ A simple, production-ready RESTful API built with Node.js, Express, and TypeScri
 - Basic logging with Pino
 - Security headers with Helmet
 - CORS support
-- Rate limiting (recommended for auth routes)
-- Environment variable management with dotenv
+- Rate limiting
 
 ## Getting Started
 
